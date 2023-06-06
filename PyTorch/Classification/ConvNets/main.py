@@ -355,6 +355,13 @@ def add_parser_arguments(parser, skip_arch=False):
         required=False,
     )
 
+    parser.add_argument(
+        "--gpu_id",
+        type=int,
+        default=0,
+        required=False,
+    )
+
 
 def prepare_for_training(args, model_args, model_arch):
     args.distributed = False
@@ -364,7 +371,7 @@ def prepare_for_training(args, model_args, model_arch):
     else:
         args.local_rank = 0
 
-    args.gpu = 0
+    args.gpu = args.gpu_id
     args.world_size = 1
 
     if args.distributed:
@@ -491,6 +498,7 @@ def prepare_for_training(args, model_args, model_arch):
         scaler=scaler,
         divide_loss=batch_size_multiplier,
         ts_script=args.jit == "script",
+        gpu_id=args.gpu_id
     )
 
     # Create data loaders and optimizers as needed
@@ -523,6 +531,7 @@ def prepare_for_training(args, model_args, model_arch):
         _worker_init_fn=_worker_init_fn,
         memory_format=memory_format,
         prefetch_factor=args.prefetch,
+        gpu_id=args.gpu_id,
     )
     if args.mixup != 0.0:
         train_loader = MixUpWrapper(args.mixup, train_loader)
@@ -538,6 +547,7 @@ def prepare_for_training(args, model_args, model_arch):
         _worker_init_fn=_worker_init_fn,
         memory_format=memory_format,
         prefetch_factor=args.prefetch,
+        gpu_id=args.gpu_id,
     )
 
     if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
