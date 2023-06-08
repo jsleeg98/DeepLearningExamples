@@ -15,6 +15,25 @@ except ImportError as e:
     )
     quant_nn = None
 
+class BinaryConv2d(nn.Conv2d):
+    """docstring for QuanConv"""
+
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
+                 padding=0, dilation=1, groups=1, bias=False):
+        super(BinaryConv2d, self).__init__(in_channels, out_channels, kernel_size, stride, padding, dilation,
+                                           groups, bias)
+        nn.init.constant_(self.weight, 0.6)
+
+    # @weak_script_method
+    def forward(self, x):
+        # weight = self.weight
+        w = self.weight.detach()
+        binary_w = (w > 0.5).float()
+        residual = w - binary_w
+        weight = self.weight - residual
+
+        output = F.conv2d(x, weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
+        return output
 
 # LayerBuilder {{{
 class LayerBuilder(object):
@@ -126,6 +145,11 @@ class LayerBuilder(object):
             "relu": lambda: nn.ReLU(inplace=True),
             "onnx-silu": ONNXSiLU,
         }[self.config.activation]()
+
+    def binaryconv1x1(self, in_planes, out_planes, groups=1):
+        """1x1 binary convolution without padding"""
+        c = BinaryConv2d(in_planes, out_planes, kernel_size=1, stride=1, padding=0, groups=groups, bias=False)
+        return c
 
 
 # LayerBuilder }}}

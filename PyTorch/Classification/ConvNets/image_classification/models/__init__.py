@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from .entrypoints import nvidia_convnets_processing_utils, nvidia_efficientnet
-from .resnet import resnet50, resnext101_32x4d, se_resnext101_32x4d
+from .resnet import resnet50, resnet50_DBC_share, resnext101_32x4d, se_resnext101_32x4d
 from .efficientnet import (
     efficientnet_b0,
     efficientnet_b4,

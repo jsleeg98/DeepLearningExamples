@@ -53,6 +53,7 @@ from image_classification.training import *
 from image_classification.utils import *
 from image_classification.models import (
     resnet50,
+    resnet50_DBC_share,
     resnext101_32x4d,
     se_resnext101_32x4d,
     efficientnet_b0,
@@ -75,6 +76,7 @@ def available_models():
         m.name: m
         for m in [
             resnet50,
+            resnet50_DBC_share,
             resnext101_32x4d,
             se_resnext101_32x4d,
             efficientnet_b0,
