@@ -54,14 +54,12 @@ class Executor:
         scaler: Optional[torch.cuda.amp.GradScaler] = None,
         divide_loss: int = 1,
         ts_script: bool = False,
-        gpu_id: int = 0,
     ):
         assert not (amp and scaler is None), "Gradient Scaler is needed for AMP"
 
         def xform(m: nn.Module) -> nn.Module:
             if cuda:
-                # m = m.cuda()
-                m = m.to(device=f'cuda:{gpu_id}')  # set gpu device
+                m = m.cuda()
             m.to(memory_format=memory_format)
             return m
 
@@ -76,7 +74,6 @@ class Executor:
         self.divide_loss = divide_loss
         self._fwd_bwd = None
         self._forward = None
-        self.gpu_id = gpu_id
 
     def distributed(self, gpu_id):
         self.is_distributed = True
@@ -167,7 +164,7 @@ class Trainer:
         if self.use_ema:
             self.ema_executor.eval()
 
-    def train_step(self, input, target, step=None, gpu_id=0):
+    def train_step(self, input, target, step=None):
         loss = self.executor.forward_backward(input, target)
 
         self.steps_since_update += 1
@@ -181,7 +178,7 @@ class Trainer:
             self.optimizer.zero_grad()
             self.steps_since_update = 0
 
-        torch.cuda.synchronize(device=f'cuda:{gpu_id}')
+        torch.cuda.synchronize()
 
         if self.use_ema:
             self.ema(self.executor.model, step=step)
@@ -214,7 +211,6 @@ def train(
     timeout_handler,
     prof=-1,
     step=0,
-    gpu_id=0,
 ):
     interrupted = False
 
@@ -226,10 +222,8 @@ def train(
         bs = input.size(0)
         lr = lr_scheduler(i)
         data_time = time.time() - end
-        input = input.to(f'cuda:{gpu_id}')
-        target = target.to(f'cuda:{gpu_id}')
 
-        loss = train_step(input, target, step=step + i, gpu_id=gpu_id)
+        loss = train_step(input, target, step=step + i)
         it_time = time.time() - end
 
         with torch.no_grad():
@@ -260,7 +254,7 @@ def train(
     return interrupted
 
 
-def validate(infer_fn, val_loader, log_fn, prof=-1, with_loss=True, topk=5, gpu_id=0):
+def validate(infer_fn, val_loader, log_fn, prof=-1, with_loss=True, topk=5):
     top1 = log.AverageMeter()
     # switch to evaluate mode
 
@@ -271,8 +265,6 @@ def validate(infer_fn, val_loader, log_fn, prof=-1, with_loss=True, topk=5, gpu_
     for i, (input, target) in data_iter:
         bs = input.size(0)
         data_time = time.time() - end
-        input = input.to(f'cuda:{gpu_id}')
-        target = target.to(f'cuda:{gpu_id}')
 
         if with_loss:
             loss, output = infer_fn(input, target)
@@ -296,7 +288,7 @@ def validate(infer_fn, val_loader, log_fn, prof=-1, with_loss=True, topk=5, gpu_
         if with_loss:
             infer_result["loss"] = (reduced_loss.item(), bs)
 
-        torch.cuda.synchronize(device=f'cuda:{gpu_id}')
+        torch.cuda.synchronize()
 
         it_time = time.time() - end
 
@@ -379,7 +371,6 @@ def train_loop(
                     timeout_handler,
                     prof=prof,
                     step=epoch * train_loader_len,
-                    gpu_id=trainer.executor.gpu_id
                 )
 
             if not skip_validation:
@@ -398,7 +389,6 @@ def train_loop(
                         val_metrics[k].log,
                         prof=prof,
                         topk=topk,
-                        gpu_id=trainer.executor.gpu_id
                     )
 
                     if k == "val":

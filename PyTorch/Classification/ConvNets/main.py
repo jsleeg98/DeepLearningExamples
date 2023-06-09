@@ -357,13 +357,6 @@ def add_parser_arguments(parser, skip_arch=False):
         required=False,
     )
 
-    parser.add_argument(
-        "--gpu_id",
-        type=int,
-        default=0,
-        required=False,
-    )
-
 
 def prepare_for_training(args, model_args, model_arch):
     args.distributed = False
