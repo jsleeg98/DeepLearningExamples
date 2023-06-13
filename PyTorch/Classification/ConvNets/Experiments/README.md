@@ -1,4 +1,5 @@
 # Training speed
+* GPU : Tesla V100-DGXS-32GB x 4
 
 |       model        | batch size |   mac_loss   |   nuc_loss   | DDP(GPUs) | latency per epoch |
 |:------------------:|:----------:|:------------:|:------------:|:---------:|:-----------------:|
