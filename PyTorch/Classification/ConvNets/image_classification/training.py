@@ -607,5 +607,7 @@ def train_loop(
             if interrupted:
                 break
 
+            print(f'best prec1 : {best_prec1}')
+
 
 # }}}
