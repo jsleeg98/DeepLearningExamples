@@ -110,6 +110,63 @@ def append_loss(model, percent=0.66, alpha=5, arch='resnet50'):
     return branch_loss * alpha_adjust, current_macs_ratio
 
 
+def append_loss_nuc(model, alpha=5):
+    alpha_adjust = alpha
+    Branches = torch.tensor([]).cuda()
+    li_conv_w = []
+    li_DBC_w = []
+    li_share_w = []
+    for name, module in model.named_modules():
+        if 'share' in name:
+            w = module.weight.detach()
+            binary_w = (w > 0.5).float()
+            residual = w - binary_w
+            branch_out = module.weight - residual
+            li_share_w.append(branch_out)
+        elif 'scale' in name:
+            w = module.weight.detach()
+            binary_w = (w > 0.5).float()
+            residual = w - binary_w
+            branch_out = module.weight - residual
+            li_DBC_w.append(branch_out)
+            Branches = torch.cat((Branches, torch.sum(torch.squeeze(branch_out), dim=0, keepdim=True)), dim=0)
+        elif isinstance(module, nn.Conv2d):
+            w = module.weight.detach().clone()
+            li_conv_w.append(w)
+
+    # insert share DBC in layer1
+    for idx in [3, 4, 7, 10]:
+        li_DBC_w.insert(idx, li_share_w[0])
+
+    # insert share DBC in layer2
+    for idx in [13, 14, 17, 20, 23]:
+        li_DBC_w.insert(idx, li_share_w[1])
+
+    # insert share DBC in layer3
+    for idx in [26, 27, 30, 33, 36, 39, 42]:
+        li_DBC_w.insert(idx, li_share_w[2])
+
+    # insert share DBC in layer4
+    for idx in [45, 46, 49, 52]:
+        li_DBC_w.insert(idx, li_share_w[3])
+
+    li_pruned_conv = []
+    for conv, DBC in zip(li_conv_w, li_DBC_w):
+        li_pruned_conv.append(conv * DBC)
+
+    origin_nuc_norm = torch.tensor([]).cuda()
+    pruned_nuc_norm = torch.tensor([]).cuda()
+    for origin, pruned in zip(li_conv_w, li_pruned_conv):
+        origin_nuc_norm = torch.cat((origin_nuc_norm, torch.unsqueeze(torch.norm(torch.flatten(origin, start_dim=1), p='nuc'), dim=0)), dim=0)
+        pruned_nuc_norm = torch.cat((pruned_nuc_norm, torch.unsqueeze(torch.norm(torch.flatten(pruned, start_dim=1), p='nuc'), dim=0)), dim=0)
+
+    # criterion = nn.MSELoss()
+    criterion = nn.L1Loss()
+    nuc_loss = criterion(origin_nuc_norm, pruned_nuc_norm)
+
+    return nuc_loss * alpha_adjust
+
+
 class Executor:
     def __init__(
         self,
@@ -124,6 +181,11 @@ class Executor:
         mac_loss_off: bool = False,
         alpha_mac: float = 0.1,
         target_ratio: float = 0.3,
+        nuc_loss_off: bool = False,
+        alpha_nuc: float = 0.1,
+        adaptive_off: bool = False,
+        adaptive_num: int = 1,
+        lamb: float = 1.0,
     ):
         assert not (amp and scaler is None), "Gradient Scaler is needed for AMP"
 
@@ -147,6 +209,14 @@ class Executor:
         self.mac_loss_off = mac_loss_off
         self.alpha_mac = alpha_mac
         self.target_ratio = target_ratio
+        self.cur_macs_ratio = 100.
+        self.mac_loss = 0.  # record mac_loss
+        self.nuc_loss_off = nuc_loss_off
+        self.alpha_nuc = alpha_nuc
+        self.nuc_loss = 0.  # record nuc_loss
+        self.adaptive_off = adaptive_off
+        self.adaptive_num = adaptive_num
+        self.lamb = lamb
 
     def distributed(self, gpu_id):
         self.is_distributed = True
@@ -166,11 +236,34 @@ class Executor:
             loss /= self.divide_loss
 
         if not self.mac_loss_off:
-            mac_loss, current_macs_ratio = append_loss(self.model, percent=self.target_ratio, alpha=self.alpha_mac,
-                                                   arch='resnet50')
-            loss += mac_loss
-            print(f'cur_macs : {current_macs_ratio}')
-            print(f'mac loss : {mac_loss}')
+            mac_loss, current_macs_ratio = append_loss_mac(self.model, percent=self.target_ratio, alpha=self.alpha_mac)
+            self.cur_macs_ratio = current_macs_ratio
+            self.mac_loss += mac_loss
+            # print(f'cur_macs : {current_macs_ratio}')
+            # print(f'mac loss : {mac_loss}')
+        else:
+            mac_loss = torch.tensor(0.)
+
+        if not self.nuc_loss_off:
+            nuc_loss = append_loss_nuc(self.model, alpha=self.alpha_nuc)
+            self.nuc_loss += mac_loss
+            # print(f'nuc loss : {nuc_loss}')
+        else:
+            nuc_loss = torch.tensor(0.)
+
+        if not self.adaptive_off:
+            c = current_macs_ratio / 100.0  # normalize current mac ratio
+            t = 1 - self.target_ratio  # normalize target mac ratio
+            r = abs(c-t) / (1-t)
+            if self.adaptive_num == 1:
+                reg_loss = torch.exp(torch.tensor(-self.lamb * r)) * nuc_loss + \
+                           (1 - torch.exp(torch.tensor(-self.lamb * r))) * mac_loss
+            elif self.adaptive_num == 2:
+                reg_loss = (1 - torch.exp(torch.tensor(self.lamb * (r - 1)))) * nuc_loss + torch.exp(
+                    torch.tensor(self.lamb * (r - 1))) * mac_loss
+        else:
+            reg_loss = nuc_loss + mac_loss
+        loss = cls_loss + reg_loss
 
         self.scaler.scale(loss).backward()
         return loss

@@ -377,6 +377,41 @@ def add_parser_arguments(parser, skip_arch=False):
         help="alpha mac",
     )
 
+    parser.add_argument(
+        "--nuc_loss_off",
+        action="store_true",
+        help="turn off nuc loss",
+    )
+
+    parser.add_argument(
+        "--alpha_nuc",
+        default=0.1,
+        type=float,
+        help="alpha nuc",
+    )
+
+    parser.add_argument(
+        "--adaptive_off",
+        action="store_true",
+        help="turn off adaptive reg loss",
+    )
+
+    parser.add_argument(
+        "--adaptive_num",
+        default=1,
+        type=int,
+        help="adaptive num",
+    )
+
+    parser.add_argument(
+        "--lamb",
+        default=1.0,
+        type=float,
+        help="lamb",
+    )
+
+
+
 
 def prepare_for_training(args, model_args, model_arch):
     args.distributed = False
@@ -515,7 +550,12 @@ def prepare_for_training(args, model_args, model_arch):
         ts_script=args.jit == "script",
         mac_loss_off=args.mac_loss_off,
         alpha_mac=args.alpha_mac,
-        target_ratio=args.target_ratio
+        target_ratio=args.target_ratio,
+        nuc_loss_off=args.nuc_loss_off,
+        alpha_nuc=args.alpha_nuc,
+        adaptive_off=args.adaptive_off,
+        adaptive_num=args.adaptive_num,
+        lamb=args.lamb
     )
 
     # Create data loaders and optimizers as needed
