@@ -246,7 +246,7 @@ def get_dali_train_loader(dali_cpu=False):
             rank = torch.distributed.get_rank()
             world_size = torch.distributed.get_world_size()
         else:
-            rank = kwargs['device_id']
+            rank = 0
             world_size = 1
 
         traindir = os.path.join(data_path, "train")
