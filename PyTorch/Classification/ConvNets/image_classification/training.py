@@ -216,6 +216,8 @@ class Executor:
         self.adaptive_off = adaptive_off
         self.adaptive_num = adaptive_num
         self.lamb = lamb
+        self.cls_loss = 0.  # record cls_loss
+        self.total_loss = 0.  # record total_loss
 
     def distributed(self, gpu_id):
         self.is_distributed = True
@@ -233,6 +235,7 @@ class Executor:
         with autocast(enabled=self.amp):
             cls_loss = self.loss(self.model(input), target)
             cls_loss /= self.divide_loss
+            self.cls_loss += cls_loss
 
         if not self.mac_loss_off:
             mac_loss, current_macs_ratio = append_loss_mac(self.model, percent=self.target_ratio, alpha=self.alpha_mac)
@@ -263,6 +266,7 @@ class Executor:
         else:
             reg_loss = nuc_loss + mac_loss
         loss = cls_loss + reg_loss
+        self.total_loss += loss
 
         self.scaler.scale(loss).backward()
         return loss
@@ -556,6 +560,8 @@ def train_loop(
                 writer.flush()
                 trainer.executor.mac_loss = 0.  # reset for next epoch
                 trainer.executor.nuc_loss = 0.  # reset for next epoch
+                trainer.executor.cls_loss = 0.  # reset for next epoch
+                trainer.executor.total_loss = 0.  # reset for next epoch
 
             if not skip_validation:
                 trainer.eval()
