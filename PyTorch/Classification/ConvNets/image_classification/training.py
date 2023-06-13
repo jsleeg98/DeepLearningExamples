@@ -591,11 +591,12 @@ def train_loop(
                     "best_prec1": best_prec1,
                     **trainer.state_dict(),
                 }
-                checkpointer.save_checkpoint(
-                    checkpoint_state,
-                    is_best,
-                    filename=f"checkpoint_{epoch:04}.pth.tar",
-                )
+                if (epoch + 1) % 10 == 0:
+                    checkpointer.save_checkpoint(
+                        checkpoint_state,
+                        is_best,
+                        filename=f"checkpoint_{epoch:04}.pth.tar",
+                    )
 
             if early_stopping_patience > 0:
                 if not is_best:
