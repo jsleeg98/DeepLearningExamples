@@ -69,6 +69,7 @@ from image_classification.optimizers import (
 )
 from image_classification.gpu_affinity import set_affinity, AffinityMode
 import dllogger
+from torch.utils.tensorboard import SummaryWriter
 
 
 def available_models():
@@ -410,6 +411,13 @@ def add_parser_arguments(parser, skip_arch=False):
         help="lamb",
     )
 
+    parser.add_argument(
+        "--tb",
+        default="test",
+        type=str,
+        help="tensorboard log name"
+    )
+
 
 
 
@@ -687,6 +695,13 @@ def main(args, model_args, model_arch):
         best_prec1,
     ) = prepare_for_training(args, model_args, model_arch)
 
+    writer = SummaryWriter(f'logs/{args.tb}')
+
+    for name, value in vars(args).items():
+        print(f'{name} : {value}')
+        writer.add_text(f'{name}', f'{value}')
+    writer.flush()
+
     train_loop(
         trainer,
         lr_policy,
@@ -708,6 +723,7 @@ def main(args, model_args, model_arch):
         checkpoint_filename=args.checkpoint_filename,
         keep_last_n_checkpoints=args.gather_checkpoints,
         topk=args.topk,
+        writer=writer
     )
     exp_duration = time.time() - exp_start_time
     if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
