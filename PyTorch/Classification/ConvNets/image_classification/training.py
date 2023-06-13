@@ -64,48 +64,47 @@ resnet50_in_list = [3, 64, 64, 64, 256, 64, 64, 256, 64, 64, 256, 128, 128, 512,
                     256, 1024, 256, 256, 1024, 512, 512, 2048, 512, 512, 2048, 512, 512]
 
 
-def append_loss(model, percent=0.66, alpha=5, arch='resnet50'):
-    if arch == 'resnet50':
-        alpha_adjust = alpha
-        Branches = torch.tensor([]).cuda()  # remain channels number
-        li_share_branch = []
-        for name, module in model.named_modules():
-            if 'share' in name:
-                w = module.weight.detach()
-                binary_w = (w > 0.5).float()
-                residual = w - binary_w
-                branch_out = module.weight - residual
-                li_share_branch.append(torch.sum(torch.squeeze(branch_out)))
-            elif 'scale' in name:
-                w = module.weight.detach()
-                binary_w = (w > 0.5).float()
-                residual = w - binary_w
-                branch_out = module.weight - residual
-                Branches = torch.cat((Branches, torch.sum(torch.squeeze(branch_out), dim=0, keepdim=True)), dim=0)
+def append_loss_mac(model, percent=0.66, alpha=5):
+    alpha_adjust = alpha
+    Branches = torch.tensor([]).cuda()  # remain channels number
+    li_share_branch = []
+    for name, module in model.named_modules():
+        if 'share' in name:
+            w = module.weight.detach()
+            binary_w = (w > 0.5).float()
+            residual = w - binary_w
+            branch_out = module.weight - residual
+            li_share_branch.append(torch.sum(torch.squeeze(branch_out)))
+        elif 'scale' in name:
+            w = module.weight.detach()
+            binary_w = (w > 0.5).float()
+            residual = w - binary_w
+            branch_out = module.weight - residual
+            Branches = torch.cat((Branches, torch.sum(torch.squeeze(branch_out), dim=0, keepdim=True)), dim=0)
 
-        # insert share DBC in layer1
-        for idx in [3, 6, 9]:
-            Branches = torch.cat((Branches[:idx], li_share_branch[0].reshape(1), Branches[idx:]))
+    # insert share DBC in layer1
+    for idx in [3, 6, 9]:
+        Branches = torch.cat((Branches[:idx], li_share_branch[0].reshape(1), Branches[idx:]))
 
-        # insert share DBC in layer2
-        for idx in [12, 15, 18, 21]:
-            Branches = torch.cat((Branches[:idx], li_share_branch[1].reshape(1), Branches[idx:]))
+    # insert share DBC in layer2
+    for idx in [12, 15, 18, 21]:
+        Branches = torch.cat((Branches[:idx], li_share_branch[1].reshape(1), Branches[idx:]))
 
-        # insert share DBC in layer3
-        for idx in [24, 27, 30, 33, 36, 39]:
-            Branches = torch.cat((Branches[:idx], li_share_branch[2].reshape(1), Branches[idx:]))
+    # insert share DBC in layer3
+    for idx in [24, 27, 30, 33, 36, 39]:
+        Branches = torch.cat((Branches[:idx], li_share_branch[2].reshape(1), Branches[idx:]))
 
-        # insert share DBC in layer4
-        for idx in [42, 45, 48]:
-            Branches = torch.cat((Branches[:idx], li_share_branch[3].reshape(1), Branches[idx:]))
+    # insert share DBC in layer4
+    for idx in [42, 45, 48]:
+        Branches = torch.cat((Branches[:idx], li_share_branch[3].reshape(1), Branches[idx:]))
 
-        target_macs = torch.tensor(sum(resnet50_list) / 1e9).cuda()
-        in_channel = torch.cat((torch.tensor([3]).cuda(), Branches[:-1]), dim=0)
+    target_macs = torch.tensor(sum(resnet50_list) / 1e9).cuda()
+    in_channel = torch.cat((torch.tensor([3]).cuda(), Branches[:-1]), dim=0)
 
-        current_macs = torch.sum(torch.tensor(in_channel) * torch.tensor(resnet50_mac_list).cuda() * Branches) / 1e9
-        criterion = nn.MSELoss()
-        branch_loss = criterion(current_macs, target_macs * (1 - percent))
-        current_macs_ratio = float(current_macs / target_macs * 100)
+    current_macs = torch.sum(torch.tensor(in_channel) * torch.tensor(resnet50_mac_list).cuda() * Branches) / 1e9
+    criterion = nn.MSELoss()
+    branch_loss = criterion(current_macs, target_macs * (1 - percent))
+    current_macs_ratio = float(current_macs / target_macs * 100)
 
     return branch_loss * alpha_adjust, current_macs_ratio
 
