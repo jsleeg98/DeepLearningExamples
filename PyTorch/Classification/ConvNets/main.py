@@ -357,6 +357,26 @@ def add_parser_arguments(parser, skip_arch=False):
         required=False,
     )
 
+    parser.add_argument(
+        "--mac_loss_off",
+        action="store_true",
+        help="turn off mac loss",
+    )
+
+    parser.add_argument(
+        "--target_ratio",
+        default=0.3,
+        type=float,
+        help="target MACs ratio",
+    )
+
+    parser.add_argument(
+        "--alpha_mac",
+        default=0.1,
+        type=float,
+        help="alpha mac",
+    )
+
 
 def prepare_for_training(args, model_args, model_arch):
     args.distributed = False
@@ -493,6 +513,9 @@ def prepare_for_training(args, model_args, model_arch):
         scaler=scaler,
         divide_loss=batch_size_multiplier,
         ts_script=args.jit == "script",
+        mac_loss_off=args.mac_loss_off,
+        alpha_mac=args.alpha_mac,
+        target_ratio=args.target_ratio
     )
 
     # Create data loaders and optimizers as needed

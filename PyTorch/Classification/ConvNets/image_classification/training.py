@@ -43,6 +43,73 @@ from .logger import TrainingMetrics, ValidationMetrics
 from .models.common import EMA
 
 
+resnet50_list = [118013952, 12845056, 115605504, 51380224, 51380224, 115605504, 51380224, 51380224, 115605504, 51380224,
+                 102760448, 115605504, 51380224, 51380224, 115605504, 51380224, 51380224, 115605504, 51380224, 51380224,
+                 115605504, 51380224, 102760448, 115605504, 51380224, 51380224, 115605504, 51380224, 51380224,
+                 115605504,
+                 51380224, 51380224, 115605504, 51380224, 51380224, 115605504, 51380224, 51380224, 115605504, 51380224,
+                 102760448, 115605504, 51380224, 51380224, 115605504, 51380224, 51380224, 115605504, 51380224]
+
+resnet50_mac_list = [614656.0, 3136.0, 28224.0, 3136.0, 3136.0, 28224.0, 3136.0, 3136.0, 28224.0, 3136.0, 3136.0,
+                     7056.0, 784.0, 784.0, 7056.0, 784.0, 784.0, 7056.0, 784.0, 784.0, 7056.0, 784.0, 784.0, 1764.0,
+                     196.0, 196.0, 1764.0, 196.0, 196.0, 1764.0, 196.0, 196.0, 1764.0, 196.0, 196.0, 1764.0, 196.0,
+                     196.0, 1764.0, 196.0, 196.0, 441.0, 49.0, 49.0, 441.0, 49.0, 49.0, 441.0, 49.0]
+
+resnet50_channel_list = [64, 64, 64, 256, 64, 64, 256, 64, 64, 256, 128, 128, 512, 128, 128, 512, 128, 128, 512,
+                         128, 128, 512, 256, 256, 1024, 256, 256, 1024, 256, 256, 1024, 256, 256, 1024, 256,
+                         256, 1024, 256, 256, 1024, 512, 512, 2048, 512, 512, 2048, 512, 512, 2048]
+
+resnet50_in_list = [3, 64, 64, 64, 256, 64, 64, 256, 64, 64, 256, 128, 128, 512, 128, 128, 512, 128, 128, 512,
+                    128, 128, 512, 256, 256, 1024, 256, 256, 1024, 256, 256, 1024, 256, 256, 1024, 256,
+                    256, 1024, 256, 256, 1024, 512, 512, 2048, 512, 512, 2048, 512, 512]
+
+
+def append_loss(model, percent=0.66, alpha=5, arch='resnet50'):
+    if arch == 'resnet50':
+        alpha_adjust = alpha
+        Branches = torch.tensor([]).cuda()  # remain channels number
+        li_share_branch = []
+        for name, module in model.named_modules():
+            if 'share' in name:
+                w = module.weight.detach()
+                binary_w = (w > 0.5).float()
+                residual = w - binary_w
+                branch_out = module.weight - residual
+                li_share_branch.append(torch.sum(torch.squeeze(branch_out)))
+            elif 'scale' in name:
+                w = module.weight.detach()
+                binary_w = (w > 0.5).float()
+                residual = w - binary_w
+                branch_out = module.weight - residual
+                Branches = torch.cat((Branches, torch.sum(torch.squeeze(branch_out), dim=0, keepdim=True)), dim=0)
+
+        # insert share DBC in layer1
+        for idx in [3, 6, 9]:
+            Branches = torch.cat((Branches[:idx], li_share_branch[0].reshape(1), Branches[idx:]))
+
+        # insert share DBC in layer2
+        for idx in [12, 15, 18, 21]:
+            Branches = torch.cat((Branches[:idx], li_share_branch[1].reshape(1), Branches[idx:]))
+
+        # insert share DBC in layer3
+        for idx in [24, 27, 30, 33, 36, 39]:
+            Branches = torch.cat((Branches[:idx], li_share_branch[2].reshape(1), Branches[idx:]))
+
+        # insert share DBC in layer4
+        for idx in [42, 45, 48]:
+            Branches = torch.cat((Branches[:idx], li_share_branch[3].reshape(1), Branches[idx:]))
+
+        target_macs = torch.tensor(sum(resnet50_list) / 1e9).cuda()
+        in_channel = torch.cat((torch.tensor([3]).cuda(), Branches[:-1]), dim=0)
+
+        current_macs = torch.sum(torch.tensor(in_channel) * torch.tensor(resnet50_mac_list).cuda() * Branches) / 1e9
+        criterion = nn.MSELoss()
+        branch_loss = criterion(current_macs, target_macs * (1 - percent))
+        current_macs_ratio = float(current_macs / target_macs * 100)
+
+    return branch_loss * alpha_adjust, current_macs_ratio
+
+
 class Executor:
     def __init__(
         self,
@@ -54,6 +121,9 @@ class Executor:
         scaler: Optional[torch.cuda.amp.GradScaler] = None,
         divide_loss: int = 1,
         ts_script: bool = False,
+        mac_loss_off: bool = False,
+        alpha_mac: float = 0.1,
+        target_ratio: float = 0.3,
     ):
         assert not (amp and scaler is None), "Gradient Scaler is needed for AMP"
 
@@ -74,6 +144,9 @@ class Executor:
         self.divide_loss = divide_loss
         self._fwd_bwd = None
         self._forward = None
+        self.mac_loss_off = mac_loss_off
+        self.alpha_mac = alpha_mac
+        self.target_ratio = target_ratio
 
     def distributed(self, gpu_id):
         self.is_distributed = True
@@ -91,6 +164,13 @@ class Executor:
         with autocast(enabled=self.amp):
             loss = self.loss(self.model(input), target)
             loss /= self.divide_loss
+
+        if not self.mac_loss_off:
+            mac_loss, current_macs_ratio = append_loss(self.model, percent=self.target_ratio, alpha=self.alpha_mac,
+                                                   arch='resnet50')
+            loss += mac_loss
+            print(f'cur_macs : {current_macs_ratio}')
+            print(f'mac loss : {mac_loss}')
 
         self.scaler.scale(loss).backward()
         return loss
@@ -166,7 +246,6 @@ class Trainer:
 
     def train_step(self, input, target, step=None):
         loss = self.executor.forward_backward(input, target)
-
         self.steps_since_update += 1
 
         if self.steps_since_update == self.grad_acc_steps:
