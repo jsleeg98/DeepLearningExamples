@@ -231,8 +231,8 @@ class Executor:
         target: torch.Tensor,
     ) -> torch.Tensor:
         with autocast(enabled=self.amp):
-            loss = self.loss(self.model(input), target)
-            loss /= self.divide_loss
+            cls_loss = self.loss(self.model(input), target)
+            cls_loss /= self.divide_loss
 
         if not self.mac_loss_off:
             mac_loss, current_macs_ratio = append_loss_mac(self.model, percent=self.target_ratio, alpha=self.alpha_mac)
@@ -543,6 +543,11 @@ def train_loop(
                     prof=prof,
                     step=epoch * train_loader_len,
                 )
+                print(f'cur macs ratio : {trainer.executor.cur_macs_ratio}')
+                print(f'mac loss(per epoch) : {trainer.executor.mac_loss}')
+                print(f'nuc loss(per epoch) : {trainer.executor.nuc_loss}')
+                trainer.executor.mac_loss = 0.  # reset for next epoch
+                trainer.executor.nuc_loss = 0.  # reset for next epoch
 
             if not skip_validation:
                 trainer.eval()
