@@ -343,37 +343,37 @@ def fast_collate(memory_format, batch):
     return tensor, targets
 
 
-def expand(num_classes, dtype, tensor, gpu_id):
+def expand(num_classes, dtype, tensor):
     e = torch.zeros(
-        tensor.size(0), num_classes, dtype=dtype, device=torch.device(f'cuda:{gpu_id}')
+        tensor.size(0), num_classes, dtype=dtype, device=torch.device("cuda")
     )
     e = e.scatter(1, tensor.unsqueeze(1), 1.0)
     return e
 
 
 class PrefetchedWrapper(object):
-    def prefetched_loader(loader, num_classes, one_hot, gpu_id):
+    def prefetched_loader(loader, num_classes, one_hot):
         mean = (
             torch.tensor([0.485 * 255, 0.456 * 255, 0.406 * 255])
-            .to(f'cuda:{gpu_id}')
+            .cuda()
             .view(1, 3, 1, 1)
         )
         std = (
             torch.tensor([0.229 * 255, 0.224 * 255, 0.225 * 255])
-            .to(f'cuda:{gpu_id}')
+            .cuda()
             .view(1, 3, 1, 1)
         )
 
-        stream = torch.cuda.Stream(device=f'cuda:{gpu_id}')
+        stream = torch.cuda.Stream()
         first = True
 
         for next_input, next_target in loader:
             with torch.cuda.stream(stream):
-                next_input = next_input.cuda(non_blocking=True, device=f'cuda:{gpu_id}')
-                next_target = next_target.cuda(non_blocking=True, device=f'cuda:{gpu_id}')
+                next_input = next_input.cuda(non_blocking=True)
+                next_target = next_target.cuda(non_blocking=True)
                 next_input = next_input.float()
                 if one_hot:
-                    next_target = expand(num_classes, torch.float, next_target, gpu_id)
+                    next_target = expand(num_classes, torch.float, next_target)
 
                 next_input = next_input.sub_(mean).div_(std)
 
@@ -382,18 +382,17 @@ class PrefetchedWrapper(object):
             else:
                 first = False
 
-            torch.cuda.current_stream(device=f'cuda:{gpu_id}').wait_stream(stream)
+            torch.cuda.current_stream().wait_stream(stream)
             input = next_input
             target = next_target
 
         yield input, target
 
-    def __init__(self, dataloader, start_epoch, num_classes, one_hot, gpu_id):
+    def __init__(self, dataloader, start_epoch, num_classes, one_hot):
         self.dataloader = dataloader
         self.epoch = start_epoch
         self.one_hot = one_hot
         self.num_classes = num_classes
-        self.gpu_id = gpu_id
 
     def __iter__(self):
         if self.dataloader.sampler is not None and isinstance(
@@ -403,7 +402,7 @@ class PrefetchedWrapper(object):
             self.dataloader.sampler.set_epoch(self.epoch)
         self.epoch += 1
         return PrefetchedWrapper.prefetched_loader(
-            self.dataloader, self.num_classes, self.one_hot, self.gpu_id
+            self.dataloader, self.num_classes, self.one_hot
         )
 
     def __len__(self):
@@ -423,7 +422,6 @@ def get_pytorch_train_loader(
     _worker_init_fn=None,
     prefetch_factor=2,
     memory_format=torch.contiguous_format,
-    gpu_id=0
 ):
     interpolation = {
         "bicubic": InterpolationMode.BICUBIC,
@@ -460,7 +458,7 @@ def get_pytorch_train_loader(
     )
 
     return (
-        PrefetchedWrapper(train_loader, start_epoch, num_classes, one_hot, gpu_id),
+        PrefetchedWrapper(train_loader, start_epoch, num_classes, one_hot),
         len(train_loader),
     )
 
@@ -477,7 +475,6 @@ def get_pytorch_val_loader(
     crop_padding=32,
     memory_format=torch.contiguous_format,
     prefetch_factor=2,
-    gpu_id=0,
 ):
     interpolation = {
         "bicubic": InterpolationMode.BICUBIC,
@@ -517,7 +514,7 @@ def get_pytorch_val_loader(
         prefetch_factor=prefetch_factor,
     )
 
-    return PrefetchedWrapper(val_loader, 0, num_classes, one_hot, gpu_id), len(val_loader)
+    return PrefetchedWrapper(val_loader, 0, num_classes, one_hot), len(val_loader)
 
 
 class SynteticDataLoader(object):
