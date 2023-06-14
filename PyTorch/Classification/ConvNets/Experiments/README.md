@@ -25,3 +25,14 @@
 | resnet50_DBC_share |    256     | $\checkmark$ |              |     4     |          48.3          |
 | resnet50_DBC_share |    256     | $\checkmark$ | $\checkmark$ |     1     |         155.8          |
 | resnet50_DBC_share |    256     | $\checkmark$ | $\checkmark$ |     4     |         156.6          |
+
+# hyperparameter search
+* dataset : ImageNet (train : 1,281,167장 val : 50,000장)
+
+## alpha_mac search
+| target ratio | alpha_mac | prune epoch | finetune epoch | Target MACs epoch | Final MACs ratio | MACs | MACs ratio | Best Acc |
+|:------------:|:---------:|:-----------:|:--------------:|:-----------------:|:----------------:|:----:|:----------:|:--------:|
+|     0.3      |     5     |     90      |       -        |                   |                  |      |            |          |
+|     0.3      |     1     |     90      |       -        |                   |                  |      |            |          |
+|     0.3      |    0.1    |     90      |       -        |                   |                  |      |            |          |
+|     0.3      |   0.01    |     90      |       -        |                   |                  |      |            |          |
