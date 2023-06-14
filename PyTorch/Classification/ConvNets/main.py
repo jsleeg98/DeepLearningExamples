@@ -368,7 +368,7 @@ def add_parser_arguments(parser, skip_arch=False):
         "--target_ratio",
         default=0.3,
         type=float,
-        help="target MACs ratio",
+        help="target MACs ratio to compress(1-target_ratio = compressed model MACs)",
     )
 
     parser.add_argument(
@@ -695,7 +695,7 @@ def main(args, model_args, model_arch):
         best_prec1,
     ) = prepare_for_training(args, model_args, model_arch)
 
-    writer = SummaryWriter(f'logs/{args.tb}')
+    writer = SummaryWriter(f'logs/mac_search/{args.tb}')
 
     for name, value in vars(args).items():
         print(f'{name} : {value}')
