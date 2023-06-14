@@ -340,7 +340,8 @@ class Trainer:
         if self.use_ema:
             self.ema_executor.eval()
 
-    def train_step(self, input, target, step=None):
+    def train_step(self, input, target, step=None, writer=None):
+        global iteration_index
         loss = self.executor.forward_backward(input, target)
         self.steps_since_update += 1
 
@@ -357,6 +358,9 @@ class Trainer:
 
         if self.use_ema:
             self.ema(self.executor.model, step=step)
+
+        writer.add_scalar("macs/cur macs ratio", self.executor.cur_macs_ratio, iteration_index)
+        iteration_index += 1
 
         return loss
 
@@ -386,6 +390,7 @@ def train(
     timeout_handler,
     prof=-1,
     step=0,
+    writer=None,
 ):
     interrupted = False
 
@@ -398,7 +403,7 @@ def train(
         lr = lr_scheduler(i)
         data_time = time.time() - end
 
-        loss = train_step(input, target, step=step + i)
+        loss = train_step(input, target, step=step + i, writer=writer)
         it_time = time.time() - end
 
         with torch.no_grad():
@@ -523,6 +528,8 @@ def train_loop(
     if early_stopping_patience > 0:
         epochs_since_improvement = 0
 
+    global iteration_index
+    iteration_index = 0
     print(f"RUNNING EPOCHS FROM {start_epoch} TO {end_epoch}")
     with utils.TimeoutHandler() as timeout_handler:
         interrupted = False
@@ -547,6 +554,7 @@ def train_loop(
                     timeout_handler,
                     prof=prof,
                     step=epoch * train_loader_len,
+                    writer=writer
                 )
                 print(f'cur macs ratio : {trainer.executor.cur_macs_ratio}')
                 print(f'mac loss(per epoch) : {trainer.executor.mac_loss}')
