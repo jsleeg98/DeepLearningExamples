@@ -559,11 +559,12 @@ def train_loop(
                 print(f'cur macs ratio : {trainer.executor.cur_macs_ratio}')
                 print(f'mac loss(per epoch) : {trainer.executor.mac_loss}')
                 print(f'nuc loss(per epoch) : {trainer.executor.nuc_loss}')
-                writer.add_scaler("loss/mac_loss", trainer.executor.mac_loss, epoch)
-                writer.add_scaler("loss/nuc_loss", trainer.executor.nuc_loss, epoch)
-                writer.add_scaler("loss/cls_loss", trainer.executor.cls_loss, epoch)
-                writer.add_scaler("loss/total_loss", trainer.executor.total_loss, epoch)
-                writer.add_scaler("macs/cur macs ratio", trainer.executor.cur_macs_ratio, epoch)
+                print(f'cls loss(per epoch : {trainer.executor.cls_loss}')
+                print(f'total loss(per epoch) : {trainer.executor.total_loss}')
+                writer.add_scalar("loss/mac_loss", trainer.executor.mac_loss, epoch)
+                writer.add_scalar("loss/nuc_loss", trainer.executor.nuc_loss, epoch)
+                writer.add_scalar("loss/cls_loss", trainer.executor.cls_loss, epoch)
+                writer.add_scalar("loss/total_loss", trainer.executor.total_loss, epoch)
 
                 writer.flush()
                 trainer.executor.mac_loss = 0.  # reset for next epoch
@@ -630,7 +631,7 @@ def train_loop(
             if interrupted:
                 break
 
-            writer.add_scaler("acc/best prec1", best_prec1, epoch)
+            writer.add_scalar("acc/best prec1", best_prec1, epoch)
             writer.flush()
             print(f'best prec1 : {best_prec1}')
 
