@@ -248,7 +248,7 @@ class Executor:
 
         if not self.nuc_loss_off:
             nuc_loss = append_loss_nuc(self.model, alpha=self.alpha_nuc)
-            self.nuc_loss += mac_loss
+            self.nuc_loss += nuc_loss
             # print(f'nuc loss : {nuc_loss}')
         else:
             nuc_loss = torch.tensor(0.)
