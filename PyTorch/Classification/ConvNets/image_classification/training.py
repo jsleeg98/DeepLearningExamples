@@ -620,6 +620,14 @@ def train_loop(
                         is_best,
                         filename=f"checkpoint_{epoch:04}.pth.tar",
                     )
+                    torch.save(trainer.state_dict()['state_dict'], checkpointer.get_full_path(f'model_epoch_{epoch + 1}.pth'))
+                if is_best:
+                    # checkpointer.save_checkpoint(
+                    #     checkpoint_state,
+                    #     is_best,
+                    #     filename=f"checkpoint_{epoch:04}.pth.tar",
+                    # )
+                    torch.save(trainer.state_dict()['state_dict'], checkpointer.get_full_path(f'model_best.pth'))
 
             if early_stopping_patience > 0:
                 if not is_best:
