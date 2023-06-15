@@ -96,9 +96,9 @@ class PruneHandler():
         li_out_channels_remain_index = self.remain_index[:]
 
         pruned_model = resnet.resnet50()
-        conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        pruned_model.conv1 = conv1
-        pruned_model.fc = nn.Linear(2048, 10)
+        # conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        # pruned_model.conv1 = conv1
+        # pruned_model.fc = nn.Linear(2048, 10)
         pruned_model.load_state_dict(self.model.state_dict(), strict=False)
 
         idx = 0
