@@ -1,5 +1,6 @@
 import torch
-from models import resnet_DBC, resnet
+from image_classification.models import resnet
+from image_classification.models import common
 import torch.nn as nn
 
 class PruneHandler():
@@ -70,7 +71,7 @@ class PruneHandler():
         scale4_shared_remain = torch.where(scale4_shared_binary == 1)[0]
 
         for name, module in self.model.named_modules():
-            if isinstance(module, resnet_DBC.BinaryConv2d):
+            if isinstance(module, common.BinaryConv2d):
                 w = module.weight.detach()
                 binary_w = (w > 0.5).float()
                 residual = w - binary_w
