@@ -20,11 +20,11 @@
 |       model        | batch size |   mac_loss   |   nuc_loss   | DDP(GPUs) | latency per epoch(min) |
 |:------------------:|:----------:|:------------:|:------------:|:---------:|:----------------------:|
 |      resnet50      |    256     |              |              |     1     |          22.5          |
-|      resnet50      |    256     |              |              |     4     |          28.3          |
+|      resnet50      |    256     |              |              |     4     |          7.1           |
 | resnet50_DBC_share |    256     | $\checkmark$ |              |     1     |          46.6          |
-| resnet50_DBC_share |    256     | $\checkmark$ |              |     4     |          48.3          |
+| resnet50_DBC_share |    256     | $\checkmark$ |              |     4     |          12.1          |
 | resnet50_DBC_share |    256     | $\checkmark$ | $\checkmark$ |     1     |         155.8          |
-| resnet50_DBC_share |    256     | $\checkmark$ | $\checkmark$ |     4     |         156.6          |
+| resnet50_DBC_share |    256     | $\checkmark$ | $\checkmark$ |     4     |          39.1          |
 
 # hyperparameter search
 * dataset : ImageNet (train : 1,281,167장 val : 50,000장)
