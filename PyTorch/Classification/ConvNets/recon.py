@@ -71,6 +71,8 @@ from image_classification.gpu_affinity import set_affinity, AffinityMode
 import dllogger
 from torch.utils.tensorboard import SummaryWriter
 import PruneHandler as PH
+from ptflops import get_model_complexity_info
+
 
 def available_models():
     models = {
@@ -524,7 +526,6 @@ def prepare_for_training(args, model_args, model_arch):
     memory_format = (
         torch.channels_last if args.memory_format == "nhwc" else torch.contiguous_format
     )
-    import pdb; pdb.set_trace()
     model = model_arch(
         **{
             k: v
@@ -533,10 +534,22 @@ def prepare_for_training(args, model_args, model_arch):
             for k, v in model_args.__dict__.items()
         }
     )
-    import pdb; pdb.set_trace()
+
+    macs, params = get_model_complexity_info(model, (3, 224, 224), as_strings=False,
+                                             print_per_layer_stat=False, verbose=True)
+    print('{:<30}  {:<8}'.format('Before Computational complexity(G): ', macs / (10 ** 9)))
+    print('{:<30}  {:<8}'.format('FLOPs(M): ', float(macs) * 2 / (10 ** 6)))
+    print('{:<30}  {:<8}'.format('Number of parameters(M): ', params / (10 ** 6)))
+
     # reconstruct model
     ph = PH.PruneHandler(model)
     model = ph.reconstruction_model('bottle', DBC=True)
+
+    macs, params = get_model_complexity_info(model, (3, 224, 224), as_strings=False,
+                                             print_per_layer_stat=False, verbose=True)
+    print('{:<30}  {:<8}'.format('After Computational complexity(G): ', macs / (10 ** 9)))
+    print('{:<30}  {:<8}'.format('FLOPs(M): ', float(macs) * 2 / (10 ** 6)))
+    print('{:<30}  {:<8}'.format('Number of parameters(M): ', params / (10 ** 6)))
 
     image_size = (
         args.image_size
