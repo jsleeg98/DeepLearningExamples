@@ -79,13 +79,13 @@ class PruneHandler():
                 tmp_remain_index = torch.where(branch_out.squeeze() == 1)[0]
                 self.remain_index.append(tmp_remain_index)
                 if 'scale2' in name:
-                    if 'layer1' in name:
+                    if 'layers.0' in name:
                         self.remain_index.append(scale1_shared_remain)
-                    elif 'layer2' in name:
+                    elif 'layers.1' in name:
                         self.remain_index.append(scale2_shared_remain)
-                    elif 'layer3' in name:
+                    elif 'layers.2' in name:
                         self.remain_index.append(scale3_shared_remain)
-                    elif 'layer4' in name:
+                    elif 'layers.3' in name:
                         self.remain_index.append(scale4_shared_remain)
 
         del self.remain_index[1:5]
