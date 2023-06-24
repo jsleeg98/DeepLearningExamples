@@ -748,6 +748,14 @@ if __name__ == "__main__":
 
     args, rest = parser.parse_known_args()
 
+    # make dirs
+    os.makedirs(f'./checkpoints/lam_search/{args.tb}', exist_ok=True)
+
+    # args setting
+    args.workspace = f'./checkpoints/lam_search/{args.tb}'
+    args.raport_file = f'{args.tb}.json'
+
+
     model_arch = available_models()[args.arch]
     model_args, rest = model_arch.parser().parse_known_args(rest)
     print(model_args)
