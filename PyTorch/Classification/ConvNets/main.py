@@ -405,7 +405,7 @@ def add_parser_arguments(parser, skip_arch=False):
     )
 
     parser.add_argument(
-        "--lamb",
+        "--alpha_lam",
         default=1.0,
         type=float,
         help="lamb",
@@ -563,7 +563,7 @@ def prepare_for_training(args, model_args, model_arch):
         alpha_nuc=args.alpha_nuc,
         adaptive_off=args.adaptive_off,
         adaptive_num=args.adaptive_num,
-        lamb=args.lamb
+        lamb=args.alpha_lam
     )
 
     # Create data loaders and optimizers as needed
