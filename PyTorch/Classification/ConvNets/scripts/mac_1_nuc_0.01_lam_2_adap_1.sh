@@ -1,0 +1,30 @@
+CUDA_VISIBLE_DEVICES=6 \
+python ./main.py \
+          -data /home/dhlee/datasets/imagenet/ \
+          --data-backend pytorch \
+          -a resnet50_DBC_share \
+          -j 5 \
+          -b 256 \
+          --momentum 0.875 \
+          --lr 0.256 \
+          --wd 3.0517578125e-05 \
+          --label-smoothing 0.1 \
+          --lr-schedule cosine \
+          --amp \
+          --static-loss-scale 256 \
+          --print-freq 1000 \
+          --seed 77 \
+          --memory-format nhwc \
+          --epochs 20 \
+          --tb mac_1_nuc_0.01_lam_2_adap_1 \
+          --alpha_mac 1 \
+          --alpha_nuc 0.01 \
+          --alpha_lam 2 \
+          --adaptive_num 1 \
+
+#          --augmentation autoaugment \
+#          --workspace ./checkpoints/ \
+#          --checkpoint-filename ./checkpoints/checkpoint_0003.pth.tar \
+#          --resume ./checkpoints/checkpoint.pth.tar \
+
+
