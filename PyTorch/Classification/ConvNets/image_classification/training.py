@@ -239,6 +239,7 @@ class Executor:
 
         if not self.mac_loss_off:
             mac_loss, current_macs_ratio = append_loss_mac(self.model, percent=self.target_ratio, alpha=self.alpha_mac)
+            mac_loss /= self.divide_loss
             self.cur_macs_ratio = current_macs_ratio
             self.mac_loss += mac_loss
             # print(f'cur_macs : {current_macs_ratio}')
@@ -248,6 +249,7 @@ class Executor:
 
         if not self.nuc_loss_off:
             nuc_loss = append_loss_nuc(self.model, alpha=self.alpha_nuc)
+            nuc_loss /= self.divide_loss
             self.nuc_loss += nuc_loss
             # print(f'nuc loss : {nuc_loss}')
         else:
